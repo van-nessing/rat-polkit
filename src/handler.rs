@@ -85,13 +85,13 @@ pub fn run(args: HandlerArgs) -> Result<()> {
 
         let agent = AuthenticationAgent::new(args, PolkitHelperConfig::default());
         let connection = conn::Builder::system()?
-            .serve_at(AuthenticationAgent::PATH, agent)?
+            .serve_at(AuthenticationAgent::OBJECT_PATH, agent)?
             .build()
             .await?;
 
         let proxy = AuthorityProxy::new(&connection).await?;
         proxy
-            .register_authentication_agent(&subject, &locale, AuthenticationAgent::PATH)
+            .register_authentication_agent(&subject, &locale, AuthenticationAgent::OBJECT_PATH)
             .await?;
 
         let mut owner_change_signal = proxy
@@ -105,7 +105,11 @@ pub fn run(args: HandlerArgs) -> Result<()> {
             // if we can get a UniqueName out of the stream, then polkit has restarted for some reason & we should reregister
             if result.is_some() {
                 proxy
-                    .register_authentication_agent(&subject, &locale, AuthenticationAgent::PATH)
+                    .register_authentication_agent(
+                        &subject,
+                        &locale,
+                        AuthenticationAgent::OBJECT_PATH,
+                    )
                     .await
                     .context("Somehow failed to reregister ourselves?")
                     .unwrap();

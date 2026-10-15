@@ -12,18 +12,17 @@
     let
       inherit (nixpkgs) lib;
       systems = lib.systems.flakeExposed;
-      eachSystem =
-        f: lib.genAttrs systems (system: f (nixpkgs.legacyPackages.${system}.extend self.overlays.default));
+      eachSystem = f: lib.genAttrs systems (system: f (nixpkgs.legacyPackages.${system}));
     in
     {
       packages = eachSystem (pkgs: {
-        default = pkgs.rat-polkit;
-        rat-polkit = pkgs.rat-polkit;
+        default = self.packages.${pkgs.stdenv.system}.rat-polkit;
+        rat-polkit = pkgs.callPackage ./package.nix { };
       });
       devShells = eachSystem (pkgs: {
         default = pkgs.mkShell {
           name = "rat-polkit";
-          inputsFrom = [ pkgs.rat-polkit ];
+          inputsFrom = [ self.packages.${pkgs.stdenv.system}.rat-polkit ];
           buildInputs = [
             pkgs.rust-analyzer
             pkgs.clippy
@@ -31,8 +30,12 @@
           ];
         };
       });
-      overlays.default = final: prev: {
-        rat-polkit = final.callPackage ./package.nix { };
+      homeModules = {
+        default = import ./module.nix self;
       };
+      overlays.rat-polkit = final: prev: {
+        rat-polkit = self.packages.${final.stdenv.system}.rat-polkit;
+      };
+      overlays.default = self.overlays.rat-polkit;
     };
 }

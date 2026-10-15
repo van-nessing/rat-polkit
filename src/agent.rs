@@ -40,7 +40,7 @@ pub struct AuthenticationAgent {
     receiver: Receiver<String>,
 }
 impl AuthenticationAgent {
-    pub const PATH: &str = "/org/ratpolkit/PolicyKit1/AuthenticationAgent";
+    pub const OBJECT_PATH: &str = "/org/ratpolkit/PolicyKit1/AuthenticationAgent";
     pub fn new(handler_args: HandlerArgs, helper: PolkitHelperConfig) -> Self {
         let (sender, receiver) = smol::channel::bounded(1);
         Self {

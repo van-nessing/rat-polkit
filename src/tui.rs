@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, Write},
+    io::{BufRead, Write, stdout},
     os::{
         linux::net::SocketAddrExt as _,
         unix::net::{SocketAddr, UnixStream},
@@ -8,7 +8,7 @@ use std::{
 
 use clap::Args;
 use color_eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{EnableFocusChange, KeyCode, KeyEvent, KeyModifiers};
 use futures_concurrency::future::Race;
 use ratatui::{
     DefaultTerminal, crossterm,
@@ -39,7 +39,6 @@ pub enum Event {
     Char(char),
     Del,
     Submit,
-    Cancel,
     Quit,
 }
 
@@ -94,6 +93,7 @@ impl App {
                     AuthResponses::Cancel => return Ok(()),
                     AuthResponses::Retry { message } => {
                         self.failed = true;
+                        self.message = message;
                         self.password.clear();
                     }
                 },
@@ -111,10 +111,9 @@ impl App {
                         })
                         .await?;
                 }
-                Event::Cancel => {
-                    self.requests.send(Request::Cancel).await?;
+                Event::Quit => {
+                    return Ok(());
                 }
-                Event::Quit => return Ok(()),
             }
         }
     }
@@ -124,9 +123,10 @@ impl Widget for &App {
     where
         Self: Sized,
     {
-        let [header, message, password, confirm] = area.layout(&Layout::vertical([
+        let [header, message, users, password, confirm] = area.layout(&Layout::vertical([
             Constraint::Length(2),
             Constraint::Percentage(100),
+            Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
         ]));
@@ -172,12 +172,15 @@ async fn crossterm_events(events: Sender<Event>) -> Result<()> {
 
     while let Some(event) = event_stream.next().await {
         match event? {
+            crossterm::event::Event::FocusLost => {
+                events.send(Event::Quit).await?;
+            }
             crossterm::event::Event::Key(KeyEvent {
                 code: KeyCode::Char('c'),
                 modifiers: KeyModifiers::CONTROL,
                 ..
             }) => {
-                events.send(Event::Cancel).await?;
+                events.send(Event::Quit).await?;
             }
             crossterm::event::Event::Key(KeyEvent {
                 code: KeyCode::Char(char),
@@ -249,12 +252,17 @@ async fn request_handler(
     Ok(())
 }
 
+fn init_term() -> Result<()> {
+    crossterm::execute!(stdout(), EnableFocusChange)?;
+    Ok(())
+}
 pub fn run(args: TuiArgs) -> Result<()> {
     let mut writer = UnixStream::connect_addr(&SocketAddr::from_abstract_name(args.socket)?)?;
     let reader = writer.try_clone()?;
 
     writer.write_all(args.token.as_bytes())?;
 
+    init_term()?;
     let mut terminal = ratatui::init();
 
     let result = smol::block_on(async {

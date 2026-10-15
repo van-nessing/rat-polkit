@@ -1,8 +1,6 @@
 {
   lib,
   rustPlatform,
-  pkg-config,
-  protobuf,
 }:
 let
   config = lib.importTOML ./Cargo.toml;
@@ -14,10 +12,6 @@ rustPlatform.buildRustPackage (finalAttrs: {
   doCheck = false;
   src = ./.;
 
-  nativeBuildInputs = [
-    pkg-config
-    protobuf
-  ];
   buildInputs = [ ];
   runtimeInputs = [ ];
   meta = {
